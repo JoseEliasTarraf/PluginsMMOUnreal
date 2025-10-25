@@ -1,0 +1,33 @@
+# Unreal Engine
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+# Projeto gerado
+*.sln
+*.VC.db
+*.VC.opendb
+.vs/
+
+# JetBrains / Rider
+.idea/
+*.iml
+
+# Visual Studio Code
+.vscode/
+
+# Caches temporários
+*.ipch
+*.log
+*.obj
+*.pch
+*.pdb
+
+# SO
+.DS_Store
+Thumbs.db
+
+# Build/Distribuição
+Build/Android/Gradle/
+Build/WindowsNoEditor/
+Build/LinuxNoEditor/
