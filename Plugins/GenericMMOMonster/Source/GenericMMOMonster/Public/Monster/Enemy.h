@@ -8,6 +8,7 @@
 
 class UHealtComponent;
 class ULootComponent;
+class UAbilitySystemComponent;
 class UAggroComponent;
 class AAIController;
 
@@ -26,6 +27,9 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly) UHealtComponent* HealthComp;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly) ULootComponent* LootComp;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly) UAggroComponent* AggroComp;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly,meta=(AllowPrivateAccess = "true")) UAbilitySystemComponent* AbilitySystemComp;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly,Category="AbilitySystem",meta=(AllowPrivateAccess = "true"))
+	class UBasicAttributeSet* BasicAttributeSet;
 
 protected:
 	virtual void BeginPlay() override;

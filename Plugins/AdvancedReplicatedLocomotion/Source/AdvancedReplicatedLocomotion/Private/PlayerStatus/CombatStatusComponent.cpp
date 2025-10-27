@@ -1,16 +1,17 @@
-﻿#include "PlayerStatus/PlayerStatusComponent.h"
+﻿#include "PlayerStatus/CombatStatusComponent.h"
+#include "AdvancedReplicatedLocomotion/GameplayAbilitySystem/AttributeSets/PlayerBasicAttributeSet.h"
+#include "Components/InputComponent.h"
+#include "TimerManager.h"
+#include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
 
-UPlayerStatusComponent::UPlayerStatusComponent()
+UCombatStatusComponent::UCombatStatusComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
 	SetIsReplicatedByDefault(true);
 }
 
-void UPlayerStatusComponent::OnRep_Level() { /* HUD pode ouvir OnLevelUp via server -> multicast opcional */ }
-void UPlayerStatusComponent::OnRep_XP() { /* HUD pode refazer barra de XP */ }
-
-void UPlayerStatusComponent::AddXP(int64 Amount, AActor* Source)
+void UCombatStatusComponent::AddXP(int64 Amount, AActor* Source)
 {
 	if (!GetOwner() || !GetOwner()->HasAuthority() || Amount <= 0) return;
 
@@ -20,8 +21,7 @@ void UPlayerStatusComponent::AddXP(int64 Amount, AActor* Source)
 
 	TryLevelUpLoop();
 }
-
-void UPlayerStatusComponent::SetXPAbsolute(int64 NewXP)
+void UCombatStatusComponent::SetXPAbsolute(int64 NewXP)
 {
 	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
 	const int64 Prev = CurrentXP;
@@ -30,7 +30,7 @@ void UPlayerStatusComponent::SetXPAbsolute(int64 NewXP)
 	TryLevelUpLoop();
 }
 
-int64 UPlayerStatusComponent::GetXPForLevel(int32 L) const
+int64 UCombatStatusComponent::GetXPForLevel(int32 L) const
 {
 	if (!LevelTable || L <= 1) return 0;
 	if (const FLevelDataTable* Row = LevelTable->FindRow<FLevelDataTable>(*FString::FromInt(L), TEXT("GetXPForLevel")))
@@ -39,7 +39,7 @@ int64 UPlayerStatusComponent::GetXPForLevel(int32 L) const
 
 }
 
-int64 UPlayerStatusComponent::GetXPToNextLevel() const
+int64 UCombatStatusComponent::GetXPToNextLevel() const
 {
 	const int32 MaxL = GetMaxDefinedLevel();
 	if (Level >= MaxL) return 0;
@@ -47,7 +47,7 @@ int64 UPlayerStatusComponent::GetXPToNextLevel() const
 	return FMath::Max<int64>(0, need - CurrentXP);
 }
 
-int32 UPlayerStatusComponent::GetMaxDefinedLevel() const
+int32 UCombatStatusComponent::GetMaxDefinedLevel() const
 {
 	if (!LevelTable) return Level;
 	TArray<FName> Names = LevelTable->GetRowNames();
@@ -61,15 +61,15 @@ int32 UPlayerStatusComponent::GetMaxDefinedLevel() const
 
 }
 
-void UPlayerStatusComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+void UCombatStatusComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(UPlayerStatusComponent, Level);
-	DOREPLIFETIME(UPlayerStatusComponent, CurrentXP);
+	DOREPLIFETIME(UCombatStatusComponent, Level);
+	DOREPLIFETIME(UCombatStatusComponent, CurrentXP);
 }
 
-void UPlayerStatusComponent::BeginPlay()
+void UCombatStatusComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
@@ -78,9 +78,15 @@ void UPlayerStatusComponent::BeginPlay()
 	{
 		UE_LOG(LogTemp, Warning, TEXT("AbilitySystem concentrate success"));
 	}
+
+	
 }
 
-void UPlayerStatusComponent::TryLevelUpLoop()
+void UCombatStatusComponent::OnRep_Level() { /* HUD pode ouvir OnLevelUp via server -> multicast opcional */ }
+
+void UCombatStatusComponent::OnRep_XP() { /* HUD pode refazer barra de XP */ }
+
+void UCombatStatusComponent::TryLevelUpLoop()
 {
 	if (!LevelTable) return;
 
@@ -100,7 +106,7 @@ void UPlayerStatusComponent::TryLevelUpLoop()
 	}
 }
 
-int32 UPlayerStatusComponent::FindLevelForXP(int64 XPTotal) const
+int32 UCombatStatusComponent::FindLevelForXP(int64 XPTotal) const
 {
 	int32 Best = 1;
 	const int32 MaxL = GetMaxDefinedLevel();
@@ -110,5 +116,32 @@ int32 UPlayerStatusComponent::FindLevelForXP(int64 XPTotal) const
 		else break;
 	}
 	return Best;
+}
+
+void UCombatStatusComponent::HandleAttributeChange(TSubclassOf<UGameplayEffect> Effect, float NewValue, float OldValue
+                                                   , float MaxValue,float DelayTime, FGameplayTagContainer TagEffect)
+{
+	if (NewValue < OldValue)
+	{
+		AbilitySystemComponent->RemoveActiveEffectsWithGrantedTags(TagEffect);
+		
+		if (UWorld* World = GetWorld())
+		{
+			FTimerHandle TimerHandle;
+			World->GetTimerManager().SetTimer(TimerHandle, FTimerDelegate::CreateLambda([this, Effect, TagEffect]() {
+				UGameplayEffect* EffectToApply = Effect->GetDefaultObject<UGameplayEffect>();
+				AbilitySystemComponent->ApplyGameplayEffectToSelf(EffectToApply, 0, FGameplayEffectContextHandle());
+			}), DelayTime, false);
+		}
+	}
+	else
+	{
+		if (NewValue >= MaxValue)
+		{
+			AbilitySystemComponent->RemoveActiveEffectsWithGrantedTags(TagEffect);
+		}
+	}
+	
+	
 }
 

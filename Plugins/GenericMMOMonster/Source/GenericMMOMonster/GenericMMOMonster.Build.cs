@@ -39,7 +39,7 @@ public class GenericMMOMonster : ModuleRules
 				"Slate",
 				"SlateCore",
                 "NavigationSystem",
-				"AIModule"
+				"AIModule","GameplayTags","GameplayAbilities","GameplayTasks"
             }
 			);
 		

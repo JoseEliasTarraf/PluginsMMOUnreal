@@ -1,3 +1,4 @@
+#pragma region Includes
 #include "Character/ARLCharacter.h"
 
 // ---------- Engine / Core ----------
@@ -30,8 +31,11 @@
 // ---------- Projeto ----------
 #include "Data/ARLStateInputMap.h"
 #include "AbilitySystemComponent.h"
+#include "AdvancedReplicatedLocomotion/GameplayAbilitySystem/AttributeSets/PlayerBasicAttributeSet.h"
 #include "LocomotionAnim/ARLAnimInstance.h"
+#pragma endregion
 
+#pragma region Ctor_BeginPlay_PostInit
 /* =============================================================================
  * Ctor / BeginPlay
  * ============================================================================= */
@@ -49,6 +53,11 @@ AARLCharacter::AARLCharacter()
 	AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
 	AbilitySystemComponent->SetIsReplicated(true);
 	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
+
+	CombatStatusComponent = CreateDefaultSubobject<UCombatStatusComponent>(TEXT("CombatStatusComponent"));
+	CombatStatusComponent->SetIsReplicated(true);
+
+	PlayerBasicAttributes = CreateDefaultSubobject<UPlayerBasicAttributeSet>(TEXT("PlayerBasicAttributes"));
 
 	SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
 	SpringArm->SetupAttachment(GetMesh(), TEXT("head"));
@@ -121,7 +130,32 @@ void AARLCharacter::PostInitializeComponents()
 	Super::PostInitializeComponents();
 	UpdateAnimState();
 }
+#pragma endregion
 
+#pragma region Possession_AbilitySystem
+void AARLCharacter::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+
+	if (AbilitySystemComponent)
+		AbilitySystemComponent->InitAbilityActorInfo(this,this);
+}
+
+void AARLCharacter::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+
+	if (AbilitySystemComponent)
+		AbilitySystemComponent->InitAbilityActorInfo(this,this);
+}
+
+UAbilitySystemComponent* AARLCharacter::GetAbilitySystemComponent() const
+{
+	return AbilitySystemComponent;
+}
+#pragma endregion
+
+#pragma region Input_Setup
 /* =============================================================================
  * Input
  * ============================================================================= */
@@ -170,8 +204,45 @@ void AARLCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 				});
 		}
 	}
-}
+	
+	
+	if (auto* CSC = FindComponentByClass<UCombatStatusComponent>())
+	{
+		if (!CSC->SkillsMap) return;
 
+		for (const FARLSkillsMapping& M : CSC->SkillsMap->SkillsMappings)
+		{
+			if (!M.Key.IsValid()) continue;
+
+			
+			TSubclassOf<UGameplayAbility> AbilityClass = M.Ability.LoadSynchronous();
+			if (!AbilityClass) continue;
+
+			
+			auto& B = PlayerInputComponent->KeyBindings.Emplace_GetRef(FInputChord(M.Key), IE_Pressed);
+			B.bConsumeInput = true;
+
+			
+			TWeakObjectPtr<UAbilitySystemComponent> WeakASC = AbilitySystemComponent;
+
+			B.KeyDelegate.GetDelegateForManualSet().BindLambda([WeakASC, AbilityClass]()
+			{
+				if (!WeakASC.IsValid() || !AbilityClass) return;
+				UAbilitySystemComponent* ASC = WeakASC.Get();
+
+				if (!ASC->FindAbilitySpecFromClass(AbilityClass) && ASC->GetOwnerRole() == ROLE_Authority)
+				{
+					ASC->GiveAbility(FGameplayAbilitySpec(AbilityClass, /*Level*/1, INDEX_NONE, ASC->GetOwner()));
+				}
+
+				ASC->TryActivateAbilityByClass(AbilityClass);
+			});
+		}
+	}
+}
+#pragma endregion
+
+#pragma region Movement_Look_States
 bool AARLCharacter::IsFirstPerson() const
 {
 	return bIsFirstPerson;
@@ -189,10 +260,7 @@ void AARLCharacter::MoveC(const FInputActionValue& Value)
 	AddMovementInput(FRotationMatrix(YawRot).GetUnitAxis(EAxis::Y), Axis.X);
 }
 
-UAbilitySystemComponent* AARLCharacter::GetAbilitySystemComponent() const
-{
-	return AbilitySystemComponent;
-}
+
 
 void AARLCharacter::OnMoveReleased(const FInputActionValue&)
 {
@@ -318,7 +386,9 @@ void AARLCharacter::SetFirstPerson(bool bFP)
 		bIsFirstPerson = false;
 	}
 }
+#pragma endregion
 
+#pragma region Attach_ReplicatedData
 /* =============================================================================
  * Attach (replicated data)
  * ============================================================================= */
@@ -395,7 +465,9 @@ void AARLCharacter::OnRep_LinkedLayer()
 			}
 		});
 }
+#pragma endregion
 
+#pragma region RepCallbacks_StatesGates
 /* =============================================================================
  * Rep callbacks
  * ============================================================================= */
@@ -489,7 +561,9 @@ void AARLCharacter::UpdateAnimState()
 		++LinkedLayerVersion;
 	}
 }
+#pragma endregion
 
+#pragma region Tick_Replication
 /* =============================================================================
  * Tick / Rep
  * ============================================================================= */
@@ -510,7 +584,9 @@ void AARLCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(AARLCharacter, RepLinkedLayerClass);
 	DOREPLIFETIME(AARLCharacter, BoneAttach);
 }
+#pragma endregion
 
+#pragma region RPCs
 /* =============================================================================
  * RPCs
  * ============================================================================= */
@@ -632,3 +708,4 @@ void AARLCharacter::Server_SetPlayerDesireRotation_Implementation(bool turn)
 {
 	GetCharacterMovement()->bUseControllerDesiredRotation = turn;
 }
+#pragma endregion

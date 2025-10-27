@@ -1,5 +1,6 @@
 #pragma once
 
+#pragma region Header_Includes
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
@@ -7,8 +8,11 @@
 #include "AbilitySystemInterface.h"
 #include "Data/ARLStateConfigAsset.h"
 #include "Data/ARL_Structs.h"
+#include "PlayerStatus/CombatStatusComponent.h"
 #include "ARLCharacter.generated.h"
+#pragma endregion
 
+#pragma region Forward_Decls
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
@@ -16,6 +20,7 @@ class UInputMappingContext;
 class UStaticMesh;
 class UARLStateInputMap;
 class UAnimInstance;
+#pragma endregion
 
 UCLASS()
 class ADVANCEDREPLICATEDLOCOMOTION_API AARLCharacter :  public ACharacter , public IAbilitySystemInterface
@@ -23,18 +28,21 @@ class ADVANCEDREPLICATEDLOCOMOTION_API AARLCharacter :  public ACharacter , publ
     GENERATED_BODY()
 
 public:
+#pragma region Public_API
     AARLCharacter();
 
     virtual void Tick(float DeltaTime) override;
     virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
-
-    
+#pragma endregion
 
 protected:
+#pragma region Lifecycle
     virtual void BeginPlay() override;
     void PostInitializeComponents();
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+#pragma endregion
 
+#pragma region Replicated_StateVars
     UPROPERTY(ReplicatedUsing = OnRep_PlayerStates, BlueprintReadOnly, Category = "Overlay States", meta = (ExposeOnSpawn = "true"))
     EStates PlayerStates = EStates::Default;
 
@@ -43,21 +51,37 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Gate Settings")
     TMap<EGatesStates, FGateSettings> GateSettingsMap;
+#pragma endregion
 
+#pragma region AbilitySystem
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
     UAbilitySystemComponent* AbilitySystemComponent;
-    
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly,Category="AbilitySystem")
+    class UPlayerBasicAttributeSet* PlayerBasicAttributes;
+#pragma endregion
+
+#pragma region Possession_Overrides
+    virtual void PossessedBy(AController* NewController) override;
+    virtual void OnRep_PlayerState();
+#pragma endregion
+
+#pragma region Animations
     UPROPERTY(EditDefaultsOnly, Category = "Animations")
     TMap<EStates, FAnimSettings> AnimationsSettingsMap;
 
     virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+#pragma endregion
 
+#pragma region Locomotion_Params
     UPROPERTY(BlueprintReadOnly, Category = "Locomotion")
     bool bCanRun = true;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Locomotion")
     bool bCanCrouch = true;
+#pragma endregion
 
+#pragma region Input_Methods
     UFUNCTION() void OnMoveReleased(const FInputActionValue& Value);
 
     UFUNCTION(Server, Reliable) void Server_RequestStopCue();
@@ -81,20 +105,23 @@ protected:
     UFUNCTION(BlueprintCallable, Category = "FirstPerson")
     void SetFirstPerson(bool bFP);
     void ToggleViewC();
+#pragma endregion
 
-    // --------- REPL CALLBACKS ---------
+#pragma region RepCallbacks
     UFUNCTION() void OnRep_PlayerStates();
     UFUNCTION() void OnRep_PlayerGate();
+#pragma endregion
 
-    // --------- STATE API ---------
+#pragma region State_API
     UFUNCTION(BlueprintCallable, Category = "States")
     void ChangeState(EStates NewState);
 
     UFUNCTION() void ChangeGate(EGatesStates LastGate, EGatesStates NewGate);
     UFUNCTION() void UpdateGateState(EGatesStates Gate);
     UFUNCTION() void UpdateAnimState();
+#pragma endregion
 
-    // --------- ATTACH ---------
+#pragma region Attach_API
     UFUNCTION(BlueprintCallable, Category = "Attach")
     void AttachHeldObject(TSubclassOf<AActor> NewChildActorClass, TSoftObjectPtr<UStaticMesh> NewMeshAsset, FName BoneToAttach);
 
@@ -115,8 +142,9 @@ protected:
 
     UFUNCTION() void OnRep_AttachState();
     UFUNCTION() void ApplyAttach();
+#pragma endregion
 
-    // --------- RPCs ---------
+#pragma region RPCs
     UFUNCTION(Server, Reliable)
     void Server_AttachHeldObject(TSubclassOf<AActor> NewChildActorClass, const TSoftObjectPtr<UStaticMesh>& NewMeshAsset, FName BoneToAttach);
 
@@ -128,8 +156,9 @@ protected:
 
     UFUNCTION(Server, Reliable)
     void Server_SetPlayerDesireRotation(bool turn);
+#pragma endregion
 
-    // --------- ANIM LAYERS ---------
+#pragma region Anim_Layers
     UPROPERTY(EditDefaultsOnly, Category = "Anim Layers")
     UARLStateConfigAsset* StateConfig = nullptr;
 
@@ -146,8 +175,9 @@ protected:
 
     UPROPERTY(Transient)
     FSoftObjectPath DesiredLayerPath;
+#pragma endregion
 
-    // --------- INPUT ASSETS ---------
+#pragma region Input_Assets
     UPROPERTY(EditAnywhere, Category = "Input") UInputMappingContext* DefaultMappingContext = nullptr;
     UPROPERTY(EditAnywhere, Category = "Input") UInputAction* Move = nullptr;
     UPROPERTY(EditAnywhere, Category = "Input") UInputAction* Look = nullptr;
@@ -159,22 +189,29 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, Category = "Input")
     UARLStateInputMap* StateKeyMap = nullptr;
+#pragma endregion
 
-    // --------- COMPONENTS ---------
+#pragma region Components
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera", meta = (AllowPrivateAccess = "true"))
     USpringArmComponent* SpringArm = nullptr;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera", meta = (AllowPrivateAccess = "true"))
     UCameraComponent* ViewCamera = nullptr;
 
-    // --- FP Clamp ---
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+    UCombatStatusComponent* CombatStatusComponent = nullptr;
+#pragma endregion
+
+#pragma region FP_Clamp
     UPROPERTY(EditAnywhere, Category = "FirstPerson|Clamp") float FP_PitchMin = -60.f;
     UPROPERTY(EditAnywhere, Category = "FirstPerson|Clamp") float FP_PitchMax = 70.f;
     UPROPERTY(EditAnywhere, Category = "FirstPerson|Clamp") float FP_YawLimit = 80.f;
     UPROPERTY(EditAnywhere, Category = "FirstPerson|Clamp") bool  bClampYawRelativeToBase = true;
 
     float FPBaseYaw = 0.f;
+#pragma endregion
 
+#pragma region Attach_Components
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Attach")
     TObjectPtr<USceneComponent> HeldObjectRoot = nullptr;
 
@@ -183,4 +220,5 @@ protected:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Attach")
     TObjectPtr<UChildActorComponent> ChildActor = nullptr;
+#pragma endregion
 };

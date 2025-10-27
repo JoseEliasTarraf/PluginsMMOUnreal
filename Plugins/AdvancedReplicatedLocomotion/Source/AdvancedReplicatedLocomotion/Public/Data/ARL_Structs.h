@@ -4,6 +4,8 @@
 #include "InputCoreTypes.h"
 #include "Animation/AnimSequence.h"
 #include "ARL_Enums.h"
+#include "InputAction.h"
+#include "Abilities/GameplayAbility.h"
 #include "ARL_Structs.generated.h"
 
 // Forward declarations (keep headers light)
@@ -258,4 +260,18 @@ struct FARLStateKey
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ARL|Input")
 	bool bOnReleased = false;
+};
+
+
+
+USTRUCT(BlueprintType)
+struct FARLSkillsMapping
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "SKILLS |Input")
+	FKey Key;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "SKILLS |Input")
+	TSoftClassPtr<UGameplayAbility> Ability = nullptr;
 };

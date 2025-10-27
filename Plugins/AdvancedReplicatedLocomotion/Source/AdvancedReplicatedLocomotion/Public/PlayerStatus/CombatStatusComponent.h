@@ -4,9 +4,11 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystemComponent.h"
+#include "InputMappingContext.h"
 #include "Level/LevelDataTable.h"
 #include "Components/ActorComponent.h"
-#include "PlayerStatusComponent.generated.h"
+#include "DataTable/Skills.h"
+#include "CombatStatusComponent.generated.h"
 
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnXPChanged, int64, NewXP, int64, Delta);
@@ -14,19 +16,22 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnLevelUp, int32, NewLevel, int3
 
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
-class ADVANCEDREPLICATEDLOCOMOTION_API UPlayerStatusComponent : public UActorComponent
+class ADVANCEDREPLICATEDLOCOMOTION_API UCombatStatusComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
 public:	
-	UPlayerStatusComponent();
+	UCombatStatusComponent();
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Leveling")
 	UDataTable* LevelTable = nullptr;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PlayerStatus")
 	UAbilitySystemComponent* AbilitySystemComponent = nullptr;
-
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skills")
+	USkillsInputMap* SkillsMap = nullptr;
+	
 	UPROPERTY(ReplicatedUsing = OnRep_Level,BlueprintReadOnly,Category="Leveling")
 	int32 Level = 1;
 
@@ -53,7 +58,9 @@ protected:
 
 	// Avan�a de n�vel at� �encaixar� com CurrentXP
 	void TryLevelUpLoop();
-	int32 FindLevelForXP(int64 XPTotal) const; // busca linear/bin�ria simples
-		
-	
+	int32 FindLevelForXP(int64 XPTotal) const;
+
+
+	UFUNCTION(BlueprintCallable)
+	void HandleAttributeChange(TSubclassOf<UGameplayEffect> Effect, float NewValue, float OldValue, float MaxValue, float DelayTime , FGameplayTagContainer TagEffect);
 };

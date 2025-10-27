@@ -1,4 +1,6 @@
 #include "Monster/Enemy.h"
+
+#include "AbilitySystemComponent.h"
 #include "Health/HealtComponent.h"
 #include "Loot/LootComponent.h"
 #include "Aggro/AggroComponent.h"
@@ -7,6 +9,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "TimerManager.h"
 #include "Engine/World.h"
+#include "GenericMMOMonster/GameplayAbilitySystem/AttributeSets/BasicAttributeSet.h"
 
 AEnemy::AEnemy()
 {
@@ -20,6 +23,12 @@ AEnemy::AEnemy()
     LootComp = CreateDefaultSubobject<ULootComponent>(TEXT("LootComp"));
     AggroComp = CreateDefaultSubobject<UAggroComponent>(TEXT("AggroComp"));
 
+    AbilitySystemComp = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComp"));
+    AbilitySystemComp->SetIsReplicated(true);
+    AbilitySystemComp->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
+
+    BasicAttributeSet = CreateDefaultSubobject<UBasicAttributeSet>(TEXT("BasicAttributeSet"));
+
     auto* CM = GetCharacterMovement();
     CM->MaxWalkSpeed = 300.f;
     CM->bOrientRotationToMovement = true;
@@ -30,12 +39,6 @@ AEnemy::AEnemy()
 void AEnemy::BeginPlay()
 {
 	Super::BeginPlay();
-
-    if (HealthComp)
-    {
-        HealthComp->OnDeath.RemoveDynamic(this, &AEnemy::OnDeath);
-        HealthComp->OnDeath.AddUniqueDynamic(this, &AEnemy::OnDeath);
-    }
 
     if (HasAuthority())
     {
@@ -86,18 +89,6 @@ void AEnemy::Server_TickCombat()
     if (Now - LastAttackTime < AttackCooldown) return;
 
     LastAttackTime = Now;
-
-    if (UHealtComponent* TargetHP = Target->FindComponentByClass<UHealtComponent>())
-    {
-        if (TargetHP != HealthComp)
-        {
-            TargetHP->ApplyDamage(10.f, GetController<AController>(), this);
-        }
-        else
-        {
-            UE_LOG(LogTemp, Warning, TEXT("[Enemy] Tentou dar dano em si mesmo (%s). Ignorando."), *GetName());
-        }
-    }
 }
 
 
